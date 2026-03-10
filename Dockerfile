@@ -8,7 +8,8 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+# Keep this compatible with environments where BuildKit isn't enabled.
+RUN pnpm install --frozen-lockfile
 
 FROM deps AS builder
 COPY . .
@@ -25,6 +26,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server.mjs ./server.mjs
+
+# Writable data dir for server-side persistence (resume + access key hash, etc.)
+RUN mkdir -p /app/data && chown -R nodeapp:nodejs /app/data
 
 USER nodeapp
 

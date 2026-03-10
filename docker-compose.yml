@@ -9,4 +9,6 @@ services:
     environment:
       - NODE_ENV=production
       - MAGIC_RESUME_ACCESS_KEY=${MAGIC_RESUME_ACCESS_KEY:-}
+    volumes:
+      - ./data:/app/data
     restart: always

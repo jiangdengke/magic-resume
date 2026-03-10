@@ -77,6 +77,12 @@ Docker Compose 示例（推荐在命令行临时注入，避免把 Key 写进仓
 MAGIC_RESUME_ACCESS_KEY=your_key_here docker compose up -d
 ```
 
+## 💾 服务端持久化（多设备编辑）
+
+在 Docker/Node 部署模式下，系统会把你的简历数据与 AI 配置持久化到服务器的 `data/` 目录中（默认挂载为 `./data`），因此你在公司电脑编辑的内容，到家里电脑输入同一个访问 Key 后也能继续编辑。
+
+你也可以在系统内的「通用设置」里直接更换访问 Key（会写入 `data/access.json`，无需改容器环境变量）。
+
 ## 📦 构建打包
 
 ```bash

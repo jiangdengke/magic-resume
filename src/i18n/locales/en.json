@@ -193,6 +193,24 @@
         "description": "Choose a folder to sync and backup your resumes.",
         "select": "Select Folder"
       },
+      "accessGate": {
+        "title": "Access Key",
+        "description": "Set or rotate the access key for site-wide access control (pages and APIs).",
+        "statusLabel": "Current status:",
+        "statusUnknown": "Unknown",
+        "statusEnabled": "Enabled",
+        "statusDisabled": "Disabled",
+        "newKeyLabel": "New access key",
+        "newKeyPlaceholder": "Enter a new access key",
+        "save": "Save Key",
+        "saving": "Saving...",
+        "saveSuccess": "Access key updated",
+        "saveFailed": "Failed to update access key",
+        "keyRequired": "Please enter the access key",
+        "unauthorized": "Unauthorized. Please enter the current access key first",
+        "logout": "Log out",
+        "loggingOut": "Logging out..."
+      },
       "ai": {
         "title": "AI Configuration",
         "currentModel": "Current Model",

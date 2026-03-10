@@ -5,6 +5,10 @@ npm-debug.log
 README.md
 .next
 .git
+.env
+.env.*
+data
+dist
 .env.local
 .env.development.local
 .env.test.local

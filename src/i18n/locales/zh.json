@@ -194,6 +194,24 @@
         "description": "选择一个文件夹来同步和备份您的简历。",
         "select": "选择文件夹"
       },
+      "accessGate": {
+        "title": "访问 Key",
+        "description": "设置或更换访问 Key，用于全站访问控制（页面与 API）。",
+        "statusLabel": "当前状态：",
+        "statusUnknown": "未知",
+        "statusEnabled": "已启用",
+        "statusDisabled": "未启用",
+        "newKeyLabel": "新的访问 Key",
+        "newKeyPlaceholder": "请输入新的访问 Key",
+        "save": "保存 Key",
+        "saving": "保存中...",
+        "saveSuccess": "访问 Key 已更新",
+        "saveFailed": "更新访问 Key 失败",
+        "keyRequired": "请输入访问 Key",
+        "unauthorized": "未授权，请先输入当前访问 Key",
+        "logout": "退出登录",
+        "loggingOut": "退出中..."
+      },
       "ai": {
         "title": "AI 配置",
         "currentModel": "当前使用的模型",

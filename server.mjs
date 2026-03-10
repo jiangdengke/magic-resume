@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
-import { createReadStream, existsSync, statSync } from "node:fs";
-import { extname, normalize, resolve } from "node:path";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
+import { extname, isAbsolute, normalize, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { createHash } from "node:crypto";
 import serverEntry from "./dist/server/server.js";
@@ -10,13 +10,71 @@ const port = Number(process.env.PORT || 3000);
 const host = process.env.HOSTNAME || "0.0.0.0";
 
 const ACCESS_COOKIE_NAME = "mr_access";
+const ACCESS_HASH_FILE = "access.json";
+const DEFAULT_DATA_DIR = "data";
+// Keep this at 0 to reflect key rotations immediately after `/api/access` updates the file.
+// (Performance impact is negligible for typical self-hosted usage.)
+const ACCESS_HASH_CACHE_TTL_MS = 0;
 
 function getAccessKey() {
-  return (process.env.MAGIC_RESUME_ACCESS_KEY || process.env.ACCESS_KEY || "").trim();
+  return String(process.env.MAGIC_RESUME_ACCESS_KEY || "").trim();
 }
 
 function sha256Hex(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+let cachedAccessHash = null;
+let cachedAccessHashAt = 0;
+
+function getDataDir() {
+  const raw = String(
+    (process.env.MAGIC_RESUME_DATA_DIR || process.env.DATA_DIR || DEFAULT_DATA_DIR) ?? DEFAULT_DATA_DIR
+  ).trim();
+  return isAbsolute(raw) ? raw : resolve(process.cwd(), raw);
+}
+
+function readAccessHashFromFile() {
+  try {
+    const filePath = resolve(getDataDir(), ACCESS_HASH_FILE);
+    if (!existsSync(filePath)) return "";
+
+    const raw = readFileSync(filePath, "utf8");
+    const parsed = JSON.parse(raw);
+    const hash =
+      parsed && typeof parsed === "object" && typeof parsed.accessHash === "string"
+        ? String(parsed.accessHash).trim()
+        : "";
+    return hash;
+  } catch (error) {
+    // Don't crash the server; fall back to env hashing.
+    console.error("Failed to read access hash file:", error);
+    return "";
+  }
+}
+
+function getAccessHash() {
+  const now = Date.now();
+  if (cachedAccessHash !== null && now - cachedAccessHashAt < ACCESS_HASH_CACHE_TTL_MS) {
+    return cachedAccessHash;
+  }
+
+  cachedAccessHashAt = now;
+
+  const fromFile = readAccessHashFromFile();
+  if (fromFile) {
+    cachedAccessHash = fromFile;
+    return fromFile;
+  }
+
+  const key = getAccessKey();
+  if (!key) {
+    cachedAccessHash = "";
+    return "";
+  }
+
+  cachedAccessHash = sha256Hex(key);
+  return cachedAccessHash;
 }
 
 function parseCookieHeader(cookieHeader) {
@@ -31,14 +89,14 @@ function parseCookieHeader(cookieHeader) {
 }
 
 function isAuthorized(nodeHeaders) {
-  const key = getAccessKey();
-  if (!key) return true; // gate disabled
+  const accessHash = getAccessHash();
+  if (!accessHash) return true; // gate disabled
 
   const cookies = parseCookieHeader(nodeHeaders.cookie || nodeHeaders.Cookie);
   const cookieValue = cookies[ACCESS_COOKIE_NAME];
   if (!cookieValue) return false;
 
-  return cookieValue === sha256Hex(key);
+  return cookieValue === accessHash;
 }
 
 function isBypassPath(pathname) {
@@ -149,8 +207,8 @@ createServer(async (req, res) => {
 
     // Site-wide access gate for Node/Docker runtime.
     // Static assets are already served above, so this only affects routed pages + APIs.
-    const accessKey = getAccessKey();
-    if (accessKey && !isBypassPath(url.pathname)) {
+    const accessHash = getAccessHash();
+    if (accessHash && !isBypassPath(url.pathname)) {
       const authorized = isAuthorized(req.headers);
       if (!authorized) {
         res.setHeader("Cache-Control", "no-store");

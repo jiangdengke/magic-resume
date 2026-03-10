@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Folder, Trash2 } from "lucide-react";
+import { Folder, Trash2, KeyRound, LogOut } from "lucide-react";
 import { useTranslations } from "@/i18n/compat/client";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,6 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   getFileHandle,
   getConfig,
@@ -21,6 +24,11 @@ const SettingsPage = () => {
   const [directoryHandle, setDirectoryHandle] =
     useState<FileSystemDirectoryHandle | null>(null);
   const [folderPath, setFolderPath] = useState<string>("");
+  const [accessEnabled, setAccessEnabled] = useState<boolean | null>(null);
+  const [accessAuthorized, setAccessAuthorized] = useState<boolean | null>(null);
+  const [newAccessKey, setNewAccessKey] = useState("");
+  const [isSavingAccessKey, setIsSavingAccessKey] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const t = useTranslations();
 
   useEffect(() => {
@@ -43,6 +51,76 @@ const SettingsPage = () => {
 
     loadSavedConfig();
   }, []);
+
+  useEffect(() => {
+    const loadAccessStatus = async () => {
+      try {
+        const res = await fetch("/api/access", {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        const data = (await res.json().catch(() => null)) as
+          | { enabled?: boolean; authorized?: boolean }
+          | null;
+
+        setAccessEnabled(Boolean(data?.enabled));
+        setAccessAuthorized(Boolean(data?.authorized));
+      } catch (error) {
+        setAccessEnabled(null);
+        setAccessAuthorized(null);
+      }
+    };
+
+    loadAccessStatus();
+  }, []);
+
+  const handleSaveAccessKey = async () => {
+    const trimmed = newAccessKey.trim();
+    if (!trimmed) {
+      toast.error(t("dashboard.settings.accessGate.keyRequired"));
+      return;
+    }
+
+    try {
+      setIsSavingAccessKey(true);
+      const res = await fetch("/api/access", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ newKey: trimmed }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        const msg =
+          data?.error === "Unauthorized"
+            ? t("dashboard.settings.accessGate.unauthorized")
+            : t("dashboard.settings.accessGate.saveFailed");
+        toast.error(msg);
+        return;
+      }
+
+      setNewAccessKey("");
+      setAccessEnabled(true);
+      setAccessAuthorized(true);
+      toast.success(t("dashboard.settings.accessGate.saveSuccess"));
+    } catch (error) {
+      toast.error(t("dashboard.settings.accessGate.saveFailed"));
+    } finally {
+      setIsSavingAccessKey(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await fetch("/api/access", { method: "DELETE", headers: { Accept: "application/json" } });
+    } catch {
+      // ignore
+    } finally {
+      setIsLoggingOut(false);
+      window.location.href = "/access";
+    }
+  };
 
   const handleSelectDirectory = async () => {
     try {
@@ -140,6 +218,82 @@ const SettingsPage = () => {
                       <Trash2 className="h-5 w-5" />
                     </Button>
                   )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all duration-300 bg-white dark:bg-gray-900/50">
+            <CardHeader className="border-b border-gray-100 dark:border-gray-800/50 pb-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 shrink-0">
+                  <KeyRound className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <div className="space-y-1">
+                  <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {t("dashboard.settings.accessGate.title")}
+                  </CardTitle>
+                  <CardDescription className="text-base text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t("dashboard.settings.accessGate.description")}
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-8 px-6 pb-8 md:px-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="text-sm text-gray-600 dark:text-gray-300">
+                  {t("dashboard.settings.accessGate.statusLabel")}{" "}
+                  <span className="font-semibold">
+                    {accessEnabled === null
+                      ? t("dashboard.settings.accessGate.statusUnknown")
+                      : accessEnabled
+                        ? t("dashboard.settings.accessGate.statusEnabled")
+                        : t("dashboard.settings.accessGate.statusDisabled")}
+                  </span>
+                </div>
+
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-xl"
+                  onClick={() => void handleLogout()}
+                  disabled={isLoggingOut || accessAuthorized === false}
+                  title={t("dashboard.settings.accessGate.logout")}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  {isLoggingOut
+                    ? t("dashboard.settings.accessGate.loggingOut")
+                    : t("dashboard.settings.accessGate.logout")}
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-access-key">
+                  {t("dashboard.settings.accessGate.newKeyLabel")}
+                </Label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Input
+                    id="new-access-key"
+                    type="password"
+                    value={newAccessKey}
+                    autoComplete="off"
+                    placeholder={t("dashboard.settings.accessGate.newKeyPlaceholder")}
+                    onChange={(e) => setNewAccessKey(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleSaveAccessKey();
+                    }}
+                    disabled={isSavingAccessKey}
+                    className="h-12 rounded-xl"
+                  />
+                  <Button
+                    onClick={() => void handleSaveAccessKey()}
+                    variant="default"
+                    className="h-12 px-6 rounded-xl"
+                    disabled={isSavingAccessKey}
+                  >
+                    {isSavingAccessKey
+                      ? t("dashboard.settings.accessGate.saving")
+                      : t("dashboard.settings.accessGate.save")}
+                  </Button>
                 </div>
               </div>
             </CardContent>
