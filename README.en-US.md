@@ -77,7 +77,7 @@ MAGIC_RESUME_ACCESS_KEY=your_key_here docker compose up -d
 
 ## 💾 Server-Side Persistence (Multi-Device Editing)
 
-In Docker/Node deployments, the app persists your resume data and AI config to the server under the `data/` directory (mounted as `./data` by default). This lets you keep editing from another computer after entering the same access key.
+In Docker/Node deployments, the app persists your resume data and AI config to the server under the `data/` directory (Docker Compose uses a named volume `magic_resume_data` by default). This lets you keep editing from another computer after entering the same access key.
 
 You can also rotate the access key from within the app (Dashboard Settings). The key hash is stored in `data/access.json`, so you don't need to change container environment variables.
 

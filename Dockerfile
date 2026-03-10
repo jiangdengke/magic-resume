@@ -19,6 +19,8 @@ FROM base AS runner
 ENV NODE_ENV=production
 WORKDIR /app
 
+RUN apk add --no-cache su-exec
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nodeapp
 
@@ -26,14 +28,16 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server.mjs ./server.mjs
+COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
 
 # Writable data dir for server-side persistence (resume + access key hash, etc.)
 RUN mkdir -p /app/data && chown -R nodeapp:nodejs /app/data
 
-USER nodeapp
+RUN chmod +x ./docker-entrypoint.sh
 
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "server.mjs"]
