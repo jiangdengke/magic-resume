@@ -8,4 +8,5 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - MAGIC_RESUME_ACCESS_KEY=${MAGIC_RESUME_ACCESS_KEY:-}
     restart: always

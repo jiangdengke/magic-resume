@@ -15,6 +15,17 @@
     "configured": "Configured",
     "notConfigured": "Not configured"
   },
+  "accessGate": {
+    "title": "Access Verification",
+    "description": "Enter the access key to continue.",
+    "inputLabel": "Access Key",
+    "inputPlaceholder": "Enter access key",
+    "submit": "Continue",
+    "submitting": "Verifying...",
+    "errorEmpty": "Please enter the access key",
+    "errorInvalid": "Invalid access key",
+    "success": "Access granted"
+  },
   "home": {
     "header": {
       "title": "Magic Resume",

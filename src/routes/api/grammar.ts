@@ -1,12 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AIModelType, AI_MODEL_CONFIGS } from "@/config/ai";
 import { formatGeminiErrorMessage, getGeminiModelInstance } from "@/lib/server/gemini";
+import { requireAccess } from "@/lib/server/access";
 
 export const Route = createFileRoute("/api/grammar")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
+          const unauthorized = await requireAccess(request);
+          if (unauthorized) return unauthorized;
+
           const body = await request.json();
           const { apiKey, model, content, modelType, apiEndpoint } = body as {
             apiKey: string;

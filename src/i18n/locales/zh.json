@@ -15,6 +15,17 @@
     "configured": "已配置",
     "notConfigured": "未配置"
   },
+  "accessGate": {
+    "title": "访问验证",
+    "description": "请输入访问 Key 以进入系统。",
+    "inputLabel": "访问 Key",
+    "inputPlaceholder": "请输入访问 Key",
+    "submit": "进入",
+    "submitting": "验证中...",
+    "errorEmpty": "请输入访问 Key",
+    "errorInvalid": "访问 Key 不正确",
+    "success": "验证成功"
+  },
   "home": {
     "header": {
       "title": "魔方简历",

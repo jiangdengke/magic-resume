@@ -65,6 +65,18 @@ pnpm dev
 
 4. 打开浏览器访问 `http://localhost:3000`
 
+## 🔑 访问 Key（可选）
+
+如果你希望部署后访问全站都需要输入 Key（包含页面与 API），请在运行时设置环境变量：
+
+- `MAGIC_RESUME_ACCESS_KEY=你的Key`
+
+Docker Compose 示例（推荐在命令行临时注入，避免把 Key 写进仓库文件）：
+
+```bash
+MAGIC_RESUME_ACCESS_KEY=your_key_here docker compose up -d
+```
+
 ## 📦 构建打包
 
 ```bash

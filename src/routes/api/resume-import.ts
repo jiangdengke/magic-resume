@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { formatGeminiErrorMessage, getGeminiModelInstance } from "@/lib/server/gemini";
+import { requireAccess } from "@/lib/server/access";
 
 const parseJsonPayload = (content: string) => {
   const text = content.trim();
@@ -44,6 +45,9 @@ export const Route = createFileRoute("/api/resume-import")({
     handlers: {
       POST: async ({ request }) => {
         try {
+          const unauthorized = await requireAccess(request);
+          if (unauthorized) return unauthorized;
+
           const body = await request.json();
           const { apiKey, model, content, images, locale } = body as {
             apiKey: string;

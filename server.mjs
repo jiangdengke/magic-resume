@@ -2,11 +2,58 @@ import { createServer } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname, normalize, resolve } from "node:path";
 import { Readable } from "node:stream";
+import { createHash } from "node:crypto";
 import serverEntry from "./dist/server/server.js";
 
 const clientDir = resolve(process.cwd(), "dist/client");
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOSTNAME || "0.0.0.0";
+
+const ACCESS_COOKIE_NAME = "mr_access";
+
+function getAccessKey() {
+  return (process.env.MAGIC_RESUME_ACCESS_KEY || process.env.ACCESS_KEY || "").trim();
+}
+
+function sha256Hex(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function parseCookieHeader(cookieHeader) {
+  if (!cookieHeader) return {};
+  const out = {};
+  for (const part of String(cookieHeader).split(";")) {
+    const [rawKey, ...rawValue] = part.trim().split("=");
+    if (!rawKey) continue;
+    out[rawKey] = decodeURIComponent(rawValue.join("=") || "");
+  }
+  return out;
+}
+
+function isAuthorized(nodeHeaders) {
+  const key = getAccessKey();
+  if (!key) return true; // gate disabled
+
+  const cookies = parseCookieHeader(nodeHeaders.cookie || nodeHeaders.Cookie);
+  const cookieValue = cookies[ACCESS_COOKIE_NAME];
+  if (!cookieValue) return false;
+
+  return cookieValue === sha256Hex(key);
+}
+
+function isBypassPath(pathname) {
+  if (!pathname) return true;
+  if (pathname === "/access" || pathname.startsWith("/access/")) return true;
+  if (pathname === "/api/access" || pathname.startsWith("/api/access/")) return true;
+  return false;
+}
+
+function deriveLocaleFromPathname(pathname) {
+  const first = String(pathname || "")
+    .split("/")
+    .filter(Boolean)[0];
+  return first === "en" || first === "zh" ? first : null;
+}
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -99,6 +146,38 @@ createServer(async (req, res) => {
     const url = new URL(req.url || "/", `${protocol}://${hostHeader}`);
 
     if (tryServeStatic(req, res, url)) return;
+
+    // Site-wide access gate for Node/Docker runtime.
+    // Static assets are already served above, so this only affects routed pages + APIs.
+    const accessKey = getAccessKey();
+    if (accessKey && !isBypassPath(url.pathname)) {
+      const authorized = isAuthorized(req.headers);
+      if (!authorized) {
+        res.setHeader("Cache-Control", "no-store");
+
+        if (url.pathname && url.pathname.startsWith("/api/")) {
+          res.statusCode = 401;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.end(JSON.stringify({ error: "Unauthorized" }));
+          return;
+        }
+
+        const redirectTarget = `/access?redirect=${encodeURIComponent(
+          `${url.pathname || "/"}${url.search || ""}`
+        )}`;
+        res.statusCode = 302;
+        const locale = deriveLocaleFromPathname(url.pathname);
+        if (locale) {
+          res.setHeader(
+            "Set-Cookie",
+            `NEXT_LOCALE=${encodeURIComponent(locale)}; Path=/; Max-Age=31536000`
+          );
+        }
+        res.setHeader("Location", redirectTarget);
+        res.end();
+        return;
+      }
+    }
 
     const method = (req.method || "GET").toUpperCase();
     const hasBody = method !== "GET" && method !== "HEAD";

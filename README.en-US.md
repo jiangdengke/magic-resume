@@ -63,6 +63,18 @@ pnpm dev
 
 4. Open browser and visit `http://localhost:3000`
 
+## 🔑 Access Key (Optional)
+
+If you want to require an access key before accessing the site (pages and APIs), set this runtime environment variable:
+
+- `MAGIC_RESUME_ACCESS_KEY=your_key`
+
+Docker Compose example (recommended to inject via CLI to avoid committing secrets):
+
+```bash
+MAGIC_RESUME_ACCESS_KEY=your_key_here docker compose up -d
+```
+
 ## 📦 Build and Deploy
 
 ```bash

@@ -41,8 +41,24 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
-  const pathname = useLocation({
-    select: (location) => location.pathname
+  const { pathname, searchStr, hash } = useLocation({
+    select: (location) => {
+      const anyLocation = location as any;
+      const resolvedSearchStr =
+        typeof anyLocation.searchStr === "string"
+          ? anyLocation.searchStr
+          : typeof anyLocation.search === "string"
+            ? anyLocation.search
+            : "";
+
+      const resolvedHash = typeof anyLocation.hash === "string" ? anyLocation.hash : "";
+
+      return {
+        pathname: location.pathname,
+        searchStr: resolvedSearchStr,
+        hash: resolvedHash
+      };
+    }
   });
   const locale = getPreferredLocale(pathname);
   const messages = locale === "en" ? enMessages : zhMessages;
@@ -50,6 +66,40 @@ function RootComponent() {
   useEffect(() => {
     document.cookie = `NEXT_LOCALE=${locale}; path=/; max-age=31536000`;
   }, [locale]);
+
+  useEffect(() => {
+    // Site-wide access gate. `/access` itself must remain reachable.
+    if (pathname === "/access" || pathname.startsWith("/access/")) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const res = await fetch("/api/access", {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          signal: controller.signal
+        });
+
+        if (controller.signal.aborted) return;
+
+        // `GET /api/access` returns 401 only when the gate is enabled and the user is not authorized.
+        if (res.status === 401) {
+          const redirectTo = `${pathname}${searchStr}${hash}`;
+          window.location.replace(
+            `/access?redirect=${encodeURIComponent(redirectTo)}`
+          );
+        }
+      } catch {
+        // If the check fails (network error), don't hard-block the UI here.
+        // Production Node runtime is protected at the server layer as well.
+      }
+    })();
+
+    return () => controller.abort();
+  }, [pathname, searchStr, hash]);
 
   return (
     <html lang={locale} suppressHydrationWarning>

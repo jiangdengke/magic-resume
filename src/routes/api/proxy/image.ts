@@ -1,10 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireAccess } from "@/lib/server/access";
 
 export const Route = createFileRoute("/api/proxy/image")({
   server: {
     handlers: {
       GET: async ({ request }) => {
         try {
+          const unauthorized = await requireAccess(request);
+          if (unauthorized) return unauthorized;
+
           const { searchParams } = new URL(request.url);
           const imageUrl = searchParams.get("url");
 
