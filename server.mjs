@@ -3,6 +3,7 @@ import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { extname, isAbsolute, normalize, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import serverEntry from "./dist/server/server.js";
 
 const clientDir = resolve(process.cwd(), "dist/client");
@@ -12,9 +13,9 @@ const host = process.env.HOSTNAME || "0.0.0.0";
 const ACCESS_COOKIE_NAME = "mr_access";
 const ACCESS_HASH_FILE = "access.json";
 const DEFAULT_DATA_DIR = "data";
-// Keep this at 0 to reflect key rotations immediately after `/api/access` updates the file.
-// (Performance impact is negligible for typical self-hosted usage.)
-const ACCESS_HASH_CACHE_TTL_MS = 0;
+const DEFAULT_SQLITE_FILE = "magic-resume.sqlite3";
+const SQLITE_KV_TABLE = "mr_kv";
+const ACCESS_HASH_CACHE_TTL_MS = 250;
 
 function getAccessKey() {
   return String(process.env.MAGIC_RESUME_ACCESS_KEY || "").trim();
@@ -27,11 +28,34 @@ function sha256Hex(value) {
 let cachedAccessHash = null;
 let cachedAccessHashAt = 0;
 
+function getStorageBackend() {
+  const raw = String(process.env.MAGIC_RESUME_STORAGE || "").trim().toLowerCase();
+  if (raw === "file" || raw === "fs" || raw === "json") return "file";
+  if (raw === "sqlite" || raw === "db") return "sqlite";
+  return "sqlite";
+}
+
 function getDataDir() {
   const raw = String(
     (process.env.MAGIC_RESUME_DATA_DIR || process.env.DATA_DIR || DEFAULT_DATA_DIR) ?? DEFAULT_DATA_DIR
   ).trim();
   return isAbsolute(raw) ? raw : resolve(process.cwd(), raw);
+}
+
+function sanitizeRelativePath(value) {
+  const normalized = String(value || "").replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!normalized) return "";
+  if (normalized.includes("..")) return "";
+  return normalized;
+}
+
+function getSqliteDbPath() {
+  const raw = String(
+    process.env.MAGIC_RESUME_SQLITE_PATH || process.env.SQLITE_PATH || DEFAULT_SQLITE_FILE
+  ).trim();
+  if (!raw) return resolve(getDataDir(), DEFAULT_SQLITE_FILE);
+  if (isAbsolute(raw)) return raw;
+  return resolve(getDataDir(), sanitizeRelativePath(raw));
 }
 
 function readAccessHashFromFile() {
@@ -53,6 +77,35 @@ function readAccessHashFromFile() {
   }
 }
 
+function readAccessHashFromSqlite() {
+  try {
+    const dbPath = getSqliteDbPath();
+    // Ensure schema exists and read the legacy key name "access.json" (same key used by server code).
+    const sql = [
+      `CREATE TABLE IF NOT EXISTS ${SQLITE_KV_TABLE} (key TEXT PRIMARY KEY, json TEXT NOT NULL, updatedAt TEXT NOT NULL);`,
+      `SELECT json FROM ${SQLITE_KV_TABLE} WHERE key='${ACCESS_HASH_FILE}' LIMIT 1;`,
+    ].join(" ");
+
+    const out = execFileSync("sqlite3", ["-batch", "-noheader", dbPath, sql], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const raw = String(out || "").trim();
+    if (!raw) return "";
+
+    const parsed = JSON.parse(raw);
+    const hash =
+      parsed && typeof parsed === "object" && typeof parsed.accessHash === "string"
+        ? String(parsed.accessHash).trim()
+        : "";
+    return hash;
+  } catch (error) {
+    console.error("Failed to read access hash from sqlite:", error);
+    return "";
+  }
+}
+
 function getAccessHash() {
   const now = Date.now();
   if (cachedAccessHash !== null && now - cachedAccessHashAt < ACCESS_HASH_CACHE_TTL_MS) {
@@ -61,7 +114,12 @@ function getAccessHash() {
 
   cachedAccessHashAt = now;
 
-  const fromFile = readAccessHashFromFile();
+  const backend = getStorageBackend();
+  let fromFile = backend === "sqlite" ? readAccessHashFromSqlite() : readAccessHashFromFile();
+  // Backward-compat: if sqlite is enabled but no record exists yet, fall back to the legacy JSON file.
+  if (!fromFile && backend === "sqlite") {
+    fromFile = readAccessHashFromFile();
+  }
   if (fromFile) {
     cachedAccessHash = fromFile;
     return fromFile;

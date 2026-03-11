@@ -9,6 +9,8 @@ services:
     environment:
       - NODE_ENV=production
       - MAGIC_RESUME_ACCESS_KEY=${MAGIC_RESUME_ACCESS_KEY:-}
+      - MAGIC_RESUME_STORAGE=${MAGIC_RESUME_STORAGE:-sqlite}
+      - MAGIC_RESUME_SQLITE_PATH=${MAGIC_RESUME_SQLITE_PATH:-magic-resume.sqlite3}
     volumes:
       - magic_resume_data:/app/data
     restart: always
