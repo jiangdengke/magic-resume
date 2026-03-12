@@ -77,11 +77,25 @@ Docker Compose 示例（推荐在命令行临时注入，避免把 Key 写进仓
 MAGIC_RESUME_ACCESS_KEY=your_key_here docker compose up -d
 ```
 
+你也可以在项目根目录创建 `.env`（参考 `.env.example`），写入 `MAGIC_RESUME_ACCESS_KEY=你的Key`，然后直接运行：
+
+```bash
+docker compose up -d
+```
+
 ## 💾 服务端持久化（多设备编辑）
 
 在 Docker/Node 部署模式下，系统会把你的简历数据与 AI 配置持久化到服务器的 `data/` 目录下的 SQLite 数据库中（默认 `data/magic-resume.sqlite3`，Docker Compose 默认使用名为 `magic_resume_data` 的 volume 持久化），因此你在公司电脑编辑的内容，到家里电脑输入同一个访问 Key 后也能继续编辑。
 
 你也可以在系统内的「通用设置」里直接更换访问 Key（会写入同一个 SQLite 数据库中，键名为 `access.json`，无需改容器环境变量）。
+
+相关环境变量：
+
+- `MAGIC_RESUME_STORAGE`：`sqlite`（默认）或 `file`
+- `MAGIC_RESUME_DATA_DIR`：默认 `data`
+- `MAGIC_RESUME_SQLITE_PATH`：默认 `magic-resume.sqlite3`（相对 `MAGIC_RESUME_DATA_DIR`）
+
+注意：该持久化仅适用于 Docker/Node 部署（会使用 Node 文件系统与 `sqlite3`）。
 
 ## 📦 构建打包
 
