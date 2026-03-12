@@ -3,6 +3,7 @@ import { useLocation } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useAIConfigStore } from "@/store/useAIConfigStore";
 import { useResumeStore } from "@/store/useResumeStore";
+import { useServerPersistenceStore } from "@/store/useServerPersistenceStore";
 
 type ResumeSnapshot = {
   resumes: Record<string, any>;
@@ -28,6 +29,11 @@ type PersistedState = {
   resume: ResumeSnapshot;
   ai: AISnapshot;
 };
+
+type ServerStateFetchResult =
+  | { kind: "ok"; exists: boolean; state: PersistedState }
+  | { kind: "unauthorized" }
+  | { kind: "unavailable" };
 
 function waitForHydration(store: any): Promise<void> {
   return new Promise((resolve) => {
@@ -117,21 +123,21 @@ function applyAISnapshot(snapshot: AISnapshot) {
   useAIConfigStore.setState(snapshot as any);
 }
 
-async function fetchServerState(signal: AbortSignal): Promise<{ exists: boolean; state: PersistedState } | null> {
+async function fetchServerState(signal: AbortSignal): Promise<ServerStateFetchResult> {
   const res = await fetch("/api/state", {
     method: "GET",
     headers: { Accept: "application/json" },
     signal
   });
 
-  if (res.status === 401) return null;
-  if (!res.ok) return null;
+  if (res.status === 401) return { kind: "unauthorized" };
+  if (!res.ok) return { kind: "unavailable" };
 
   const data = (await res.json().catch(() => null)) as
     | { exists?: boolean; state?: PersistedState }
     | null;
-  if (!data?.state) return null;
-  return { exists: Boolean(data.exists), state: data.state };
+  if (!data?.state) return { kind: "unavailable" };
+  return { kind: "ok", exists: Boolean(data.exists), state: data.state };
 }
 
 async function saveServerState(
@@ -219,12 +225,24 @@ export function ServerStateSync() {
       inflightRef.current = controller;
 
       try {
-        const server = await fetchServerState(controller.signal);
+        const serverResult = await fetchServerState(controller.signal);
         if (cancelled) return;
 
         // If the access gate is enabled and we are not authorized yet, don't start.
         // We'll retry on the next navigation (e.g. after logging in on `/access`).
-        if (!server) return;
+        if (serverResult.kind === "unauthorized") {
+          useServerPersistenceStore.getState().setStatus("unauthorized");
+          return;
+        }
+
+        if (serverResult.kind === "unavailable") {
+          useServerPersistenceStore.getState().setStatus("unavailable");
+          disabledRef.current = true;
+          return;
+        }
+
+        useServerPersistenceStore.getState().setStatus("available");
+        const server = serverResult;
 
         const localResume = pickResumeSnapshot();
         const localAi = pickAISnapshot();
@@ -270,6 +288,7 @@ export function ServerStateSync() {
         startedRef.current = true;
       } catch {
         // If server persistence isn't available, keep local-only behavior.
+        useServerPersistenceStore.getState().setStatus("unavailable");
         disabledRef.current = true;
       }
     })();

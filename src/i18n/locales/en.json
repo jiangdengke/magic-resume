@@ -145,7 +145,12 @@
       },
       "notice": {
         "title": "Attention",
-        "description": "It is recommended to configure a resume backup folder in the settings to prevent your data from being lost when the browser cache is cleared",
+        "description": "It is recommended to configure a resume backup folder in Settings (optional). If server-side saving is not enabled, clearing the browser cache may cause data loss.",
+        "goToSettings": "Go to Settings"
+      },
+      "serverSaved": {
+        "title": "Server Saving Enabled",
+        "description": "Your resumes and AI config are automatically saved on the server for multi-device editing. The local backup folder is optional.",
         "goToSettings": "Go to Settings"
       },
       "deleteConfirmTitle": "Confirm Delete Resume?",

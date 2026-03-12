@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslations, useLocale } from "@/i18n/compat/client";
 import { useRouter } from "@/lib/navigation";
-import { Plus, Settings, AlertCircle } from "lucide-react";
+import { Plus, Settings, AlertCircle, Cloud } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { getConfig, getFileHandle, verifyPermission } from "@/utils/fileSystem";
 import { useResumeStore } from "@/store/useResumeStore";
 import { useAIConfigStore } from "@/store/useAIConfigStore";
+import { useServerPersistenceStore } from "@/store/useServerPersistenceStore";
 import { DEFAULT_TEMPLATES } from "@/config";
 import { CreateResumeModal } from "./CreateResumeModal";
 import { ImportResumeDialog } from "./ImportResumeDialog";
@@ -49,6 +50,7 @@ export const ResumeWorkbench = () => {
         geminiModelId,
     } = useAIConfigStore();
     const router = useRouter();
+    const serverPersistenceStatus = useServerPersistenceStore((s) => s.status);
     const [hasConfiguredFolder, setHasConfiguredFolder] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -328,7 +330,28 @@ export const ResumeWorkbench = () => {
                                 </Button>
                             </AlertDescription>
                         </Alert>
-                    ) : (
+                    ) : serverPersistenceStatus === "available" ? (
+                        <Alert className="mb-6 bg-blue-50/50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900">
+                            <Cloud className="h-4 w-4 text-blue-700 dark:text-blue-400" />
+                            <AlertTitle>{t("dashboard.resumes.serverSaved.title")}</AlertTitle>
+                            <AlertDescription className="flex items-center justify-between">
+                                <span className="text-blue-700 dark:text-blue-400">
+                                    {t("dashboard.resumes.serverSaved.description")}
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="ml-4 hover:bg-blue-100 dark:hover:bg-blue-900"
+                                    onClick={() => {
+                                        router.push("/app/dashboard/settings");
+                                    }}
+                                >
+                                    <Settings className="w-4 h-4 mr-2" />
+                                    {t("dashboard.resumes.serverSaved.goToSettings")}
+                                </Button>
+                            </AlertDescription>
+                        </Alert>
+                    ) : serverPersistenceStatus === "unavailable" ? (
                         <Alert
                             variant="destructive"
                             className="mb-6 bg-red-50/50 dark:bg-red-950/30 border-red-200 dark:border-red-900"
@@ -352,7 +375,7 @@ export const ResumeWorkbench = () => {
                                 </Button>
                             </AlertDescription>
                         </Alert>
-                    )}
+                    ) : null}
                 </motion.div>
 
                 <motion.div

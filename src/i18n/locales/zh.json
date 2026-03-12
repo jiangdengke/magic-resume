@@ -146,7 +146,12 @@
       },
       "notice": {
         "title": "注意",
-        "description": "建议在设置里中配置简历备份文件夹，防止您的数据可能会在浏览器清除缓存后丢失",
+        "description": "建议在设置中配置简历备份文件夹（可选）。当未启用服务端保存时，浏览器清除缓存可能导致数据丢失。",
+        "goToSettings": "前往设置"
+      },
+      "serverSaved": {
+        "title": "已开启服务端保存",
+        "description": "简历与 AI 配置会自动保存到服务器，多设备可继续编辑。本地备份文件夹为可选项。",
         "goToSettings": "前往设置"
       },
       "deleteConfirmTitle": "确认删除简历？",
